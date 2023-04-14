@@ -38,44 +38,12 @@ class EmployeesSearch(APIView):
         serializer = EmployeesSerializer(employees_page, many=True)
         # Return the serialized data in a Response object
         return Response(serializer.data)
-    
-    
-
-class EmployeesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Employees
-        fields = ('id', 'first_name', 'last_name', 'middle_name', 'suffix','Birthday','salary', 'RegularizationDate','is_Regular')
-        read_only_fields = ('id',)
-        write_only_fields = ('is_Regular', 'RegularizationDate')
-
-    def create(self, validated_data):
-        return Employees.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        instance.is_Regular = validated_data.get('is_Regular', instance.is_Regular)
-        instance.RegularizationDate = validated_data.get('RegularizationDate', instance.RegularizationDate)
-        instance.Birthday = validated_data.get('Birthday', instance.Birthday)
-        instance.save()
-        return instance
-
 
 class EmployeeList(APIView):
     def get(self, request):
         employees = Employees.objects.all()
         serializer = EmployeesSerializer(employees, many=True)
         return Response(serializer.data)
-
-    def post(self, request):
-        employee_id = request.data.get('employee_id')
-        if not Employees.objects.filter(id=employee_id).exists():
-            raise Http404
-        serializer = EmployeesSerializer(data=request.data)
-        if serializer.is_valid(): 
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-       
-
 
 class EmployeeDetail(APIView):
     def get_object(self, pk):
@@ -88,19 +56,6 @@ class EmployeeDetail(APIView):
         employee = self.get_object(pk)
         serializer = EmployeesSerializer(employee)
         return Response(serializer.data)
-
-    def put(self, request, pk):
-        employee = self.get_object(pk)
-        serializer = EmployeesSerializer(employee, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        employee = self.get_object(pk)
-        employee.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
     
 class EmployeesRegularization(APIView):
     def get_object(self, pk):
@@ -133,27 +88,11 @@ class CreateEmployee(APIView):
     # Create a new employee record
     def post(self, request):
         serializer = EmployeesSerializer(data=request.data)
-        birthdate_str = request.data.get('birthday')
-        if birthdate_str:
-            try:
-                birthdate = datetime.date.fromisoformat(birthdate_str)
-                today = datetime.date.today()
-                if birthdate < today:
-                    return Response({'error': 'birthdate cannot be a future date'}, status=status.HTTP_400_BAD_REQUEST)
-            except ValueError:
-                return Response({'error': 'invalid date format for birthdate'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if 'middle_name' in request.data and not request.data['middle_name']:
-            request.data.pop('middle_name')
-
-        if 'suffix' in request.data and not request.data['suffix']:
-            request.data.pop('suffix')
 
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class EditEmployee(APIView):
         # Get employee object based on the given primary key 'pk'
     def get_object(self, pk):
@@ -161,31 +100,20 @@ class EditEmployee(APIView):
             return Employees.objects.get(pk=pk)
         except Employees.DoesNotExist:
             raise Http404
+    
     # Partial update an employee record
     def patch(self, request, pk):
         employee = self.get_object(pk) # Retrieve employee object based on the given primary key 'pk'
-        # Validating birthdate field
-        birthdate_str = request.data.get('birthday')
-        if birthdate_str:
-            try:
-                birthdate = datetime.date.fromisoformat(birthdate_str)
-                today = datetime.date.today()
-                if birthdate < today:
-                    return Response({'error': 'birthdate cannot be a future date'}, status=status.HTTP_400_BAD_REQUEST)
-            except ValueError:
-                return Response({'error': 'invalid date format for birthdate'}, status=status.HTTP_400_BAD_REQUEST)
-            request.data['birthday'] = birthdate.strftime('%Y-%m-%d')
         
-        # Removing middle_name and suffix fields if they are not present in request data
-        request_data = request.data.copy()
-        request_data.pop('middle_name', None)
-        request_data.pop('suffix', None)
+        # Deserialize request data into EmployeeSerializer
+        serializer = EmployeesSerializer(employee, data=request.data, partial=True)
         
-        serializer = EmployeesSerializer(employee, data=request_data, partial=True) # Deserialize request data into EmployeeSerializer
         if serializer.is_valid(): # Check if the data is valid
             serializer.save() # Update the employee record with the new data
             return Response(serializer.data) # Return serialized data as response
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) # Return error messages with status code 400 (bad request)
+
 
 class DeleteEmployee(APIView):
     # Delete an employee record
@@ -222,15 +150,7 @@ class WorkSchedulesView(APIView):
         except Exception as e:
             # If an error occurs, return a server error response
             return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-class WorkScheduleCreateView(APIView):
-    def post(self, request, format=None):
-        serializer = WorkScheduleSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class EmployeeView(APIView):
     def get(self, request, employee_id):
