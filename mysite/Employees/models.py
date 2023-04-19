@@ -14,13 +14,13 @@ class Employees(models.Model):
     middle_name = models.CharField(max_length=200, null=True, blank=True)
     last_name = models.CharField(max_length=200)
     suffix = models.CharField(max_length=200, null=True, blank=True)
-    Birthday = models.DateField(null=True)
+    birthday = models.DateField(null=True)
     civil_status = models.CharField(max_length=200, choices=CIVIL_STATUS_CHOICES)
     create_date = models.DateTimeField(auto_now_add=True)
     update_date = models.DateTimeField(null=True, blank=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     hire_date = models.DateField(auto_now_add=True)
-    is_Regular = models.BooleanField(default=False)
+    isRegular = models.BooleanField(default=False)
     RegularizationDate = models.DateField(null=True)
     EmploymentDate = models.DateField(null=True)
 
@@ -31,10 +31,10 @@ class Employees(models.Model):
         """
         Validate RegularizationDate is greater than or equal to hire_date
         """
-        if self.isRegular and self.RegularizationDate > self.hire_date:
+        if self.isRegular and self.RegularizationDate is not None and self.hire_date is not None and self.RegularizationDate > self.hire_date:
             raise ValidationError('Regularization date cannot be earlier than hire date.')
 
-        if self.Birthday and self.Birthday > timezone.now().date():
+        if self.birthday and self.birthday > timezone.now().date():
             raise ValidationError("Birthdate cannot be in the future.")
         
 class WorkSchedule(models.Model):

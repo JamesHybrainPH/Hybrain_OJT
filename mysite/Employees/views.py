@@ -1,16 +1,49 @@
 from .serializers import WorkScheduleSerializer , EmployeesSerializer
-from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from .models import Employees, WorkSchedule
 from django.core.paginator import Paginator
 from rest_framework.views import APIView
+from rest_framework import status
 from django.http import Http404
 from django.db.models import Q
-from django.views import View
-import datetime
 
 
-class EmployeesSearch(APIView):
+class EmployeesView(APIView):
+    # Get employee object based on the given primary key 'pk'
+    def get_object(self, pk):
+        try:
+            return Employees.objects.get(pk=pk)
+        except Employees.DoesNotExist:
+            raise Http404
+    
+    # Create a new employee record
+    def post(self, request):
+        serializer = EmployeesSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Partial update an employee record
+    def patch(self, request, pk):
+        employee = self.get_object(pk) # Retrieve employee object based on the given primary key 'pk'
+        
+        # Deserialize request data into EmployeeSerializer
+        serializer = EmployeesSerializer(employee, data=request.data, partial=True)
+        
+        if serializer.is_valid(): # Check if the data is valid
+            serializer.save() # Update the employee record with the new data
+            return Response(serializer.data) # Return serialized data as response
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) # Return error messages with status code 400 (bad request)
+
+    # Delete an employee record
+    def delete(self, request, pk):
+        employee = self.get_object(pk) # Retrieve employee object based on the given primary key 'pk'
+        employee.delete() # Delete the employee record from the database
+        return Response(status=status.HTTP_204_NO_CONTENT) # Return status code 204 (no content) as response
+
     def get(self, request):
         keyword = request.query_params.get('keyword', '')
         keywords = keyword.split()
@@ -84,44 +117,6 @@ class EmployeesRegularization(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-class CreateEmployee(APIView):
-    # Create a new employee record
-    def post(self, request):
-        serializer = EmployeesSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-class EditEmployee(APIView):
-        # Get employee object based on the given primary key 'pk'
-    def get_object(self, pk):
-        try:
-            return Employees.objects.get(pk=pk)
-        except Employees.DoesNotExist:
-            raise Http404
-    
-    # Partial update an employee record
-    def patch(self, request, pk):
-        employee = self.get_object(pk) # Retrieve employee object based on the given primary key 'pk'
-        
-        # Deserialize request data into EmployeeSerializer
-        serializer = EmployeesSerializer(employee, data=request.data, partial=True)
-        
-        if serializer.is_valid(): # Check if the data is valid
-            serializer.save() # Update the employee record with the new data
-            return Response(serializer.data) # Return serialized data as response
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) # Return error messages with status code 400 (bad request)
-
-
-class DeleteEmployee(APIView):
-    # Delete an employee record
-    def delete(self, request, pk):
-        employee = self.get_object(pk) # Retrieve employee object based on the given primary key 'pk'
-        employee.delete() # Delete the employee record from the database
-        return Response(status=status.HTTP_204_NO_CONTENT) # Return status code 204 (no content) as response
-
 class WorkSchedulesView(APIView):
     def get(self, request, format=None):
         work_schedules = WorkSchedule.objects.all()

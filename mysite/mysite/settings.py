@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'Employees',
+    'Users',
     'rest_framework',
 ]
 REST_FRAMEWORK = {
