@@ -1,18 +1,18 @@
-from django.contrib.auth.hashers import check_password
-from django.http import JsonResponse
+from .serializers import UserSerializer,EmployeesSerializer
 from rest_framework.response import Response
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from .serializers import UserSerializer
 from rest_framework.views import APIView
 from rest_framework.views import APIView
-from .serializers import UserSerializer
 from rest_framework import status , viewsets
 from .models import UserAccount
-from django.views import View
+from datetime import timedelta
+from django.conf import settings
 import uuid
 import hashlib
-
+import jwt
+import datetime
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -42,28 +42,45 @@ class CreateUserAPIView(APIView):
 class LoginUserAPIView(APIView):
     def post(self, request):
         # Get username and password from request data
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-
-        # Lookup user by username
+        username = request.data.get('username')
+        password = request.data.get('password')     
+        # Find user with given username
         try:
-            user = UserAccount.objects.get(useraccess=username, isActive=True)
+            user = UserAccount.objects.get(useraccess=username)
         except UserAccount.DoesNotExist:
-            return JsonResponse({'error': 'Username does not exist'})
+            return Response({'error': 'Username does not exist'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if user is active
+        if not user.isActive:
+            return Response({'error': 'Account is disabled'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Verify password
+        salt = user.salt
+        hashed_password = hashlib.sha512((password + salt).encode('utf-8')).hexdigest()
 
-# Check password
-        if not check_password(password, user.passphrase):
-            return JsonResponse({'error': 'Incorrect password'})
-
-        # Get user details
-        user_details = {
-            'id': user.id,
-            'username': user.useraccess,
-            'user_type': user.user_type,
-            'employee_id': user.employee_id.id,
-            'first_name': user.employee_id.first_name,
-            'last_name': user.employee_id.last_name,
-            # add other employee fields as needed
+        if hashed_password != user.passphrase:
+            return Response({'error': 'Incorrect password'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Serialize user and employee data
+        user_serializer = UserSerializer(user)
+        employee_serializer = EmployeesSerializer(user.employee_id)
+        serialized_user = user_serializer.data
+        serialized_employee = employee_serializer.data
+        
+        # Remove passphrase and salt from serialized user data
+        serialized_user.pop('passphrase', None)
+        serialized_user.pop('salt', None)
+        
+        # Combine user and employee data into a single dictionary
+        user_data = {**serialized_user, **serialized_employee}
+        
+        # Generate JWT token with expiration time of 1 hour
+        jwt_payload = {
+            'user_data': user_data,
+            'exp': datetime.datetime.utcnow() + timedelta(hours=1)
         }
-
-        return JsonResponse(user_details)
+        jwt_token = jwt.encode(jwt_payload, settings.SECRET_KEY, algorithm='HS256')
+        
+        # Return serialized user and JWT token in response
+        return Response({'user': user_data, 'jwt_token': jwt_token})
+    

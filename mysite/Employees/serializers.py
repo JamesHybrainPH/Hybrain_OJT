@@ -44,7 +44,7 @@ class EmployeesSerializer(serializers.ModelSerializer):
             return 'short-tenure'
         else:
             return 'long-tenure'
-
+    
         
 class WorkScheduleSerializer(serializers.ModelSerializer):
     employee = serializers.PrimaryKeyRelatedField(queryset=Employees.objects.all())

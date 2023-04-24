@@ -3,14 +3,20 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserAccount , Employees
 import hashlib
-
+import datetime
 class EmployeesSerializer(serializers.ModelSerializer):
     tenureship = serializers.SerializerMethodField()
     class Meta:
         model = Employees
         fields = ('id', 'first_name', 'middle_name', 'last_name',
                 'suffix', 'birthday', 'civil_status','create_date', 'update_date','isRegular','RegularizationDate', 'EmploymentDate', 'tenureship')
-
+        
+    def get_tenureship(self, obj):
+        # Calculate tenureship based on the employee's hire date
+        hire_date = obj.hire_date
+        today = datetime.date.today()
+        years_of_service = today.year - hire_date.year - ((today.month, today.day) < (hire_date.month, hire_date.day))
+        return years_of_service
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserAccount
