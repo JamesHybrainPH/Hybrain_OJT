@@ -2,7 +2,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserAccount , Employees
+from django.core.exceptions import ValidationError
 import datetime
+import re
 
 class EmployeesSerializer(serializers.ModelSerializer):
     tenureship = serializers.SerializerMethodField()
@@ -67,4 +69,40 @@ class UserSerializer(serializers.ModelSerializer):
         if UserAccount.objects.filter(useraccess=value).exists():
             raise serializers.ValidationError("Username already in use")
         return value
-    
+COMMON_PASSWORDS = [
+    'password',
+    '123456',
+    'qwerty',
+    'abc123',
+    'letmein',
+    'monkey',
+    'dragon',
+    'baseball',
+    'football',
+    'iloveyou',
+]
+
+class PassphraseSerializer(serializers.Serializer):
+    passphrase = serializers.CharField()
+
+    def validate_passphrase(self, value):
+        # Check if passphrase is a common password
+        if value in COMMON_PASSWORDS:
+            raise serializers.ValidationError('This passphrase is too common.')
+
+        # Check if passphrase meets Django's password validation requirements
+        try:
+            validate_password(value)
+        except ValidationError as e:
+            raise serializers.ValidationError(str(e))
+
+        # Check if passphrase is alphanumeric
+        if not re.match(r'^\w+$', value):
+            raise serializers.ValidationError('Passphrase must be alphanumeric.')
+
+        # Check if passphrase is unique to this user
+        user = self.context['request'].user
+        if user and user.check_password(value):
+            raise serializers.ValidationError('Passphrase cannot be the same as your current password.')
+
+        return value
