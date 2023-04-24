@@ -2,8 +2,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserAccount , Employees
-import hashlib
 import datetime
+
 class EmployeesSerializer(serializers.ModelSerializer):
     tenureship = serializers.SerializerMethodField()
     class Meta:
@@ -67,3 +67,4 @@ class UserSerializer(serializers.ModelSerializer):
         if UserAccount.objects.filter(useraccess=value).exists():
             raise serializers.ValidationError("Username already in use")
         return value
+    
