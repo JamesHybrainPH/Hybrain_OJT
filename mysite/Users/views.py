@@ -1,14 +1,13 @@
 from .serializers import UserSerializer,EmployeesSerializer
-from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .serializers import UserSerializer
-from rest_framework.views import APIView
-from rest_framework.views import APIView
 from rest_framework import status , viewsets
+from rest_framework.views import APIView
+from .serializers import UserSerializer
+from django.conf import settings
 from .models import UserAccount
 from datetime import timedelta
-from django.conf import settings
 import uuid
 import hashlib
 import jwt
@@ -17,6 +16,7 @@ import datetime
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
 
 class CreateUserAPIView(APIView):
     def post(self, request):
@@ -39,7 +39,9 @@ class CreateUserAPIView(APIView):
                 del errors['non_field_errors']
             # Return a response with the serializer's validation errors
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        
 class LoginUserAPIView(APIView):
+
     def post(self, request):
         # Get username and password from request data
         username = request.data.get('username')
@@ -80,7 +82,8 @@ class LoginUserAPIView(APIView):
             'exp': datetime.datetime.utcnow() + timedelta(hours=1)
         }
         jwt_token = jwt.encode(jwt_payload, settings.SECRET_KEY, algorithm='HS256')
-        
-        # Return serialized user and JWT token in response
-        return Response({'user': user_data, 'jwt_token': jwt_token})
     
+    # Return serialized user and JWT token in response
+        response_data = {'user': user_data, 'jwt_token': jwt_token}
+        return Response(response_data, status=status.HTTP_200_OK)
+
