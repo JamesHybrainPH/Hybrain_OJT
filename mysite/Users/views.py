@@ -1,5 +1,5 @@
 from .serializers import UserSerializer,EmployeesSerializer
-from rest_framework.permissions import IsAuthenticated
+from Users.authentication import BearerTokenAuthentication
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework import status , viewsets
@@ -13,12 +13,17 @@ import hashlib
 import jwt
 import datetime
 
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+class UsersListView(APIView):
+    authentication_classes = [BearerTokenAuthentication]
+    #authentication_classes = [JWTAuthentication]
+    def get(self, request):
 
+        Users = UserAccount.objects.all()
+        serializer = UserSerializer(Users, many=True)
+        return Response(serializer.data)
 class CreateUserAPIView(APIView):
+    authentication_classes = [BearerTokenAuthentication]
+    #permission_classes = [IsAuthenticated]
     def post(self, request):
         serializer = UserSerializer(data=request.data)
 
@@ -78,12 +83,13 @@ class LoginUserAPIView(APIView):
         
         # Generate JWT token with expiration time of 1 hour
         jwt_payload = {
+            'user_id': user.employee_id.id,
             'user_data': user_data,
             'exp': datetime.datetime.utcnow() + timedelta(hours=1)
         }
         jwt_token = jwt.encode(jwt_payload, settings.SECRET_KEY, algorithm='HS256')
     
     # Return serialized user and JWT token in response
-        response_data = {'user': user_data, 'jwt_token': jwt_token}
+        response_data = {'user': user_data, 'jwt_token': jwt_token.decode('utf-8'),'token_id': user.employee_id.id ,'token_type': 'access', 'expires_in': 3600}
         return Response(response_data, status=status.HTTP_200_OK)
 

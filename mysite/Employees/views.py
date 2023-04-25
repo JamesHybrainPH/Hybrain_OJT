@@ -1,4 +1,5 @@
 from .serializers import WorkScheduleSerializer , EmployeesSerializer
+from Users.authentication import BearerTokenAuthentication
 from rest_framework.response import Response
 from .models import Employees, WorkSchedule
 from django.core.paginator import Paginator
@@ -9,6 +10,7 @@ from django.db.models import Q
 
 
 class EmployeesView(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     # Get employee object based on the given primary key 'pk'
     def get_object(self, pk):
         try:
@@ -73,12 +75,14 @@ class EmployeesView(APIView):
         return Response(serializer.data)
 
 class EmployeeList(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     def get(self, request):
         employees = Employees.objects.all()
         serializer = EmployeesSerializer(employees, many=True)
         return Response(serializer.data)
 
 class EmployeeDetail(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     def get_object(self, pk):
         try:
             return Employees.objects.get(pk=pk)
@@ -91,6 +95,7 @@ class EmployeeDetail(APIView):
         return Response(serializer.data)
     
 class EmployeesRegularization(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     def get_object(self, pk):
         try:
             return Employees.objects.get(pk=pk)
@@ -118,6 +123,7 @@ class EmployeesRegularization(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class WorkSchedulesView(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     def get(self, request, format=None):
         work_schedules = WorkSchedule.objects.all()
         serializer = WorkScheduleSerializer(work_schedules, many=True)
@@ -148,6 +154,7 @@ class WorkSchedulesView(APIView):
 
 
 class EmployeeView(APIView):
+    authentication_classes = [BearerTokenAuthentication]
     def get(self, request, employee_id):
         try:
             # Get the employee with the specified ID
