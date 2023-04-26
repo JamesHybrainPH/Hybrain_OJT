@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserAccount , Employees
 from django.core.exceptions import ValidationError
+from rest_framework.permissions import BasePermission
 import datetime
 import re
 
@@ -12,7 +13,16 @@ class EmployeesSerializer(serializers.ModelSerializer):
         model = Employees
         fields = ('id', 'first_name', 'middle_name', 'last_name',
                 'suffix', 'birthday', 'civil_status','create_date', 'update_date','isRegular','RegularizationDate', 'EmploymentDate', 'tenureship')
-        
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'employee_id': {'required': False},
+            'username': {'required': False},
+            'email': {'required': False},
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+            'CreatedBy': {'write_only': True},
+            'UpdatedBy': {'write_only': True},
+            }
     def get_tenureship(self, obj):
         # Calculate tenureship based on the employee's hire date
         hire_date = obj.hire_date
@@ -112,3 +122,25 @@ class PassphraseSerializer(serializers.Serializer):
             raise serializers.ValidationError('Passphrase cannot be the same as your current password.')
 
         return value
+    
+#class UserTypePermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.User
+        if user.is_authenticated:
+            if user.user_type == UserAccount.ADMIN:
+                return True
+            elif user.user_type == UserAccount.EMPLOYEE:
+                allowed_methods = {
+                    'GET': ['list', 'retrieve'],
+                    'POST': ['create'],
+                    'PUT': ['update'],
+                    'PATCH': ['partial_update'],
+                    'DELETE': ['destroy']
+                }
+                method = request.method
+                if method in allowed_methods.keys() and view.action in allowed_methods[method]:
+                    return True
+            else:
+                return False
+        else:
+            return False

@@ -1,41 +1,51 @@
 from .serializers import UserSerializer,EmployeesSerializer
 from Users.authentication import BearerTokenAuthentication
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-from rest_framework import status , viewsets
+from rest_framework import status
 from rest_framework.views import APIView
 from .serializers import UserSerializer
 from django.conf import settings
 from .models import UserAccount
 from datetime import timedelta
+from rest_framework.permissions import IsAuthenticated
 import uuid
 import hashlib
 import jwt
 import datetime
 
+def get_user_from_token(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION')
+    if auth_header:
+        try:
+            token = auth_header.split(' ')[1]
+            decoded_token = jwt.decode(token, 'SECRET_KEY', algorithms=['HS256'])
+            return decoded_token['name']
+        except jwt.exceptions.DecodeError:
+            pass
+    return None
 class UsersListView(APIView):
     authentication_classes = [BearerTokenAuthentication]
-    #authentication_classes = [JWTAuthentication]
-    def get(self, request):
+    def get(self,request):
 
         Users = UserAccount.objects.all()
         serializer = UserSerializer(Users, many=True)
         return Response(serializer.data)
+
 class CreateUserAPIView(APIView):
     authentication_classes = [BearerTokenAuthentication]
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = UserSerializer(data=request.data)
 
         if serializer.is_valid():
-            # Generate a unique salt for each record
-            salt = uuid.uuid4().hex
-            # Hash the plain text password with the generated salt
-            passphrase = serializer.validated_data['passphrase']
-            # Encode the salted password as UTF-8 and hash it using SHA-512
-            hashed_password = hashlib.sha512((passphrase + salt).encode('utf-8')).hexdigest()
+            # Set the 'CreatedBy' and 'UpdatedBy' fields using the logged-in user's information
+            user_name = get_user_from_token(request)
+            serializer.validated_data['CreatedBy'] = user_name
+            serializer.validated_data['UpdatedBy'] = user_name
+            
             # Save the new user record to the database
-            user = serializer.save(salt=salt, passphrase=hashed_password)
+            user = serializer.save()
             # Return a response with the created user's employee_id, useraccess, and employee_id
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
@@ -90,6 +100,6 @@ class LoginUserAPIView(APIView):
         jwt_token = jwt.encode(jwt_payload, settings.SECRET_KEY, algorithm='HS256')
     
     # Return serialized user and JWT token in response
-        response_data = {'user': user_data, 'jwt_token': jwt_token.decode('utf-8'),'token_id': user.employee_id.id ,'token_type': 'access', 'expires_in': 3600}
+        response_data = {'user': user_data, 'jwt_token': jwt_token if isinstance(jwt_token, str) else jwt_token.decode('utf-8'), 'token_id': user.employee_id.id, 'token_type': 'access', 'expires_in': 3600}
         return Response(response_data, status=status.HTTP_200_OK)
 

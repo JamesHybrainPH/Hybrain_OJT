@@ -1,15 +1,17 @@
-from rest_framework.exceptions import ValidationError
 from .models import Employees, WorkSchedule
 from rest_framework import serializers
-from datetime import timezone
 from datetime import datetime , timedelta
+from rest_framework.permissions import BasePermission
+from Users.models import UserAccount
 
 class EmployeesSerializer(serializers.ModelSerializer):
     tenureship = serializers.SerializerMethodField()
+    created_by = serializers.CharField(read_only=True)
+    updated_by = serializers.CharField(read_only=True)
     class Meta:
         model = Employees
         fields = ('id', 'first_name', 'middle_name', 'last_name',
-                'suffix', 'birthday', 'civil_status','create_date', 'update_date','isRegular','RegularizationDate', 'EmploymentDate', 'tenureship')
+                'suffix', 'birthday', 'civil_status','create_date', 'update_date','isRegular','RegularizationDate', 'EmploymentDate', 'tenureship','created_by','updated_by')
 
     def validate_birthday(self, value):
         """

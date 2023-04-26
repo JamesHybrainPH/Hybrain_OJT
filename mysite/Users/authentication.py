@@ -2,8 +2,7 @@ import jwt
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
-
-
+from .models import UserAccount
 class BearerTokenAuthentication(BaseAuthentication):
     keyword = 'Bearer'
 
@@ -30,4 +29,15 @@ class BearerTokenAuthentication(BaseAuthentication):
         if not user_id or not user_data:
             raise AuthenticationFailed('Invalid token')
 
-        return (user_data, None)
+        # Get the authenticated user object using the user_id from the token payload
+        try:
+            user = UserAccount.objects.get(id=user_id)
+        except UserAccount.DoesNotExist:
+            raise AuthenticationFailed('User not found')
+
+        return (user, None)
+
+
+class UnauthenticatedPermission:
+    def has_permission(self, request, view):
+        return True
