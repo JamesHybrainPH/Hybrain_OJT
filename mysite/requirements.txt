@@ -11,3 +11,11 @@ djangorestframework-simplejwt
 mssql-django
 pyodbc
 django-user-agents
+django 
+environ
+django-environ
+mssql
+django-mssql
+pyodbc
+mssql-django
+django-mssql-backend

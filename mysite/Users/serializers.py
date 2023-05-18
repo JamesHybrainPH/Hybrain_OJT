@@ -1,66 +1,59 @@
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.models import User
-from rest_framework import serializers
-from .models import UserAccount , Employees
 from django.core.exceptions import ValidationError
-from rest_framework.permissions import BasePermission
-import datetime
-import re
+from rest_framework import serializers
+from .models import Users, Employees
+import jwt
+from django.conf import settings
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework import exceptions
 
 class EmployeesSerializer(serializers.ModelSerializer):
-    tenureship = serializers.SerializerMethodField()
     class Meta:
         model = Employees
-        fields = ('id', 'first_name', 'middle_name', 'last_name',
-                'suffix', 'birthday', 'civil_status','create_date', 'update_date','isRegular','RegularizationDate', 'EmploymentDate', 'tenureship')
-        extra_kwargs = {
-            'password': {'write_only': True},
-            'employee_id': {'required': False},
-            'username': {'required': False},
-            'email': {'required': False},
-            'first_name': {'required': False},
-            'last_name': {'required': False},
-            'CreatedBy': {'write_only': True},
-            'UpdatedBy': {'write_only': True},
-            }
-    def get_tenureship(self, obj):
-        # Calculate tenureship based on the employee's hire date
-        hire_date = obj.hire_date
-        today = datetime.date.today()
-        years_of_service = today.year - hire_date.year - ((today.month, today.day) < (hire_date.month, hire_date.day))
-        return years_of_service
-class UserSerializer(serializers.ModelSerializer):
+        fields = ( 'firstname', 'middlename', 'lastname',
+                   'suffix')
+        
+class UsersSerializer(serializers.ModelSerializer):
+    employee_id = serializers.PrimaryKeyRelatedField(queryset=Employees.objects.all())
+    UserType = serializers.ChoiceField(choices=Users.USER_TYPE_CHOICES)
+    full_name = serializers.SerializerMethodField(read_only=True)
     class Meta:
-        model = UserAccount
-        fields = ('id', 'employee_id', 'useraccess', 'passphrase', 'created_by', 'user_type')
+        model = Users
+        fields = ('id','UserType','employee_id', 'useraccess', 'passphrase', 'created_by','full_name')
+        extra_kwargs = {
+            'created_by': {'required': False}
+        }
+        depth = 1
+
+    def get_full_name(self, obj):
+        return f"{obj.employee_id.firstname} {obj.employee_id.lastname}"
+
+
+    def create(self, validated_data):
+        created_by = validated_data.pop('created_by')  # Get the value of created_by
+        user = Users.objects.create(**validated_data)  # Create the user instance
+        user.created_by = created_by  # Set the created_by field
+        user.save()  # Save the user instance
+        return user
+
+    
+    def create_UserType(self, validated_data):
+        # Extract the UserType property from the validated data
+        user_type = validated_data.pop('UserType', None)
+        # Create a new user with the remaining validated data
+        user = Users.objects.create(**validated_data)
+        # Set the UserType property on the new user
+        if user_type is not None:
+            user.UserType = user_type
+            user.save()
+        return user
 
     def validate_employee_id(self, value):
         # Check if employee_id already exists in users table
-        if UserAccount.objects.filter(employee_id=value).exists():
+        if Users.objects.filter(employee_id=value).exists():
             raise serializers.ValidationError("Employee already has an account")
         return value
-        
-    def validate_passphrase(self, value):
-        # Perform custom password validation using Django's built-in password validation and third-party library django-password-validators
-        validate_password(value)  # check length, common sequences, and other built-in validation rules
-        return value
-
-    def validate_user_type(self, value):
-        if value not in ['Administrator', 'Employee']:
-            raise serializers.ValidationError("Invalid user type")
-        return value
-
-    def validate_useraccess(self, value):
-        # Check if useraccess value is unique
-        if UserAccount.objects.filter(useraccess=value).exists():
-            raise serializers.ValidationError("Username already in use")
-        return value
     
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already in use")
-        return value
-           
     def to_internal_value(self, data):
         # Try to get the internal value of the data using the base class implementation
         try:
@@ -76,71 +69,11 @@ class UserSerializer(serializers.ModelSerializer):
     
     def validate_useraccess(self, value):
         # Check if useraccess value is unique
-        if UserAccount.objects.filter(useraccess=value).exists():
+        if Users.objects.filter(useraccess=value).exists():
             raise serializers.ValidationError("Username already in use")
         return value
-    
-COMMON_PASSWORDS = [
-    'PASSWORD12345678',
-    '12345678',
-    'QWERT12345',
-    'ABC12345',
-    '12345PASSWORD',
-    'ABC12345678',
-    'JAMES12345',
-    '12345678ABC',
-    '12345JAMES',
-    'PASSWORD12345678',
-]
-
-class PassphraseSerializer(serializers.Serializer):
-    passphrase = serializers.CharField()
 
     def validate_passphrase(self, value):
-    # Convert passphrase to lowercase for case-insensitive comparison
-        value = value.lower()
-        print('Lowercase passphrase:', value)
-
-    # Check if passphrase is a common password
-        print('COMMON_PASSWORDS:', COMMON_PASSWORDS)
-        if value in COMMON_PASSWORDS:
-            raise serializers.ValidationError('This passphrase is too common.')
-        
-    # Check if passphrase meets Django's password validation requirements
-        try:
-            validate_password(value)
-        except ValidationError as e:
-            raise serializers.ValidationError(str(e))
-
-    # Check if passphrase is alphanumeric
-        if not re.match(r'^\w+$', value):
-            raise serializers.ValidationError('Passphrase must be alphanumeric.')
-
-    # Check if passphrase is unique to this user
-        user = self.context['request'].user
-        if user and user.check_password(value):
-            raise serializers.ValidationError('Passphrase cannot be the same as your current password.')
-
+        # Perform custom password validation using Django's built-in password validation and third-party library django-password-validators
+        validate_password(value)  # check length, common sequences, and other built-in validation rules
         return value
-    
-#class UserTypePermission(BasePermission):
-    def has_permission(self, request, view):
-        user = request.User
-        if user.is_authenticated:
-            if user.user_type == UserAccount.ADMIN:
-                return True
-            elif user.user_type == UserAccount.EMPLOYEE:
-                allowed_methods = {
-                    'GET': ['list', 'retrieve'],
-                    'POST': ['create'],
-                    'PUT': ['update'],
-                    'PATCH': ['partial_update'],
-                    'DELETE': ['destroy']
-                }
-                method = request.method
-                if method in allowed_methods.keys() and view.action in allowed_methods[method]:
-                    return True
-            else:
-                return False
-        else:
-            return False

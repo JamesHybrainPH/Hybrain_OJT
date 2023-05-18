@@ -1,22 +1,22 @@
 from django.db import models
-from  Employees.models import Employees
+from Employees.models import Employees
 
+class Users(models.Model):
 
-class UserAccount(models.Model):
-    id = models.AutoField(primary_key=True)
+    USER_TYPE_CHOICES = [
+        ('Administrator', 'Administrator'),
+        ('Employees', 'Employees'),
+    ]
+    UserType = models.CharField(max_length=255, choices=USER_TYPE_CHOICES,default='Employees')
     employee_id = models.ForeignKey(Employees, on_delete=models.CASCADE)
     isActive = models.BooleanField(default=True)
     useraccess = models.CharField(max_length=255)
     passphrase = models.TextField()
     salt = models.CharField(max_length=255)
-    created_by = models.CharField(max_length=255)
+    created_by = models.CharField(max_length=255, null=True)
     created_datetime = models.DateTimeField(auto_now_add=True)
-    user_type = models.CharField(choices=(('Administrator', 'Administrator'), ('Employee', 'Employee')), max_length=20, default='Employee')
-
-    def is_authenticated(self):
-        return True
     class Meta:
-        db_table = 'UserAccount'
+        db_table = 'users' 
     def __str__(self):
         return self.useraccess
-    
+
